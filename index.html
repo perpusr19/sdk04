@@ -147,7 +147,7 @@ th:last-child, td:last-child {
             .maskot-intro { margin-top: -45px; padding: 20px; }
             .action-buttons { justify-content: flex-start; }
         }
-        }
+        
         /* Memaksa kolom ke-5 (Status Waktu) agar tidak terdesak */
 #tabel-publik th:nth-child(5), 
 #tabel-publik td:nth-child(5) {
@@ -575,6 +575,87 @@ th:last-child, td:last-child {
     };
     
     // Pastikan listener onSnapshot juga ditutup dengan benar di sini...
+    // ==========================================
+    // TAMPILKAN DATA SECARA REAL-TIME DI TABEL
+    // ==========================================
+    onSnapshot(collection(db, "peminjaman"), (snapshot) => {
+        const tbodyPublik = document.getElementById('tbody-publik');
+        const tbodyAdmin = document.getElementById('tbody-admin');
+        
+        // Bersihkan isi tabel sebelum diisi ulang agar tidak duplikat
+        if(tbodyPublik) tbodyPublik.innerHTML = "";
+        if(tbodyAdmin) tbodyAdmin.innerHTML = "";
+
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const id = docSnap.id;
+            
+            // 1. Hitung Status Sisa Hari / Terlambat
+            const tglPinjam = new Date(data.tglPinjam);
+            const tglHarusKembali = new Date(tglPinjam.getTime() + (MAX_HARI * 24 * 60 * 60 * 1000));
+            const hariIni = new Date();
+            
+            // Selisih waktu dalam milidetik ke hari
+            const diffTime = tglHarusKembali - hariIni;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            let badgeStatus = "";
+            if (diffDays < 0) {
+                badgeStatus = `<span class="badge-terlambat">⚠️ Terlambat ${Math.abs(diffDays)} Hari</span>`;
+            } else {
+                badgeStatus = `<span class="badge-sisa">⏳ Sisa ${diffDays} Hari</span>`;
+            }
+
+            // Format Tampilan Tanggal (DD/MM/YYYY)
+            const opsiTgl = { day: '2-digit', month: '2-digit', year: 'numeric' };
+            const tglDiformat = tglPinjam.toLocaleDateString('id-ID', opsiTgl);
+
+            // 2. Masukkan ke Tabel Publik (Halaman Home)
+            if(tbodyPublik) {
+                const rowPublik = `
+                    <tr>
+                        <td>${data.nama}</td>
+                        <td>${data.kelas}</td>
+                        <td>${data.buku}</td>
+                        <td>${tglDiformat}</td>
+                        <td>${badgeStatus}</td>
+                    </tr>
+                `;
+                tbodyPublik.innerHTML += rowPublik;
+            }
+
+            // 3. Masukkan ke Tabel Admin (Halaman Kelola Data)
+            if(tbodyAdmin) {
+                const rowAdmin = `
+                    <tr>
+                        <td>${data.nama}</td>
+                        <td>${data.kelas}</td>
+                        <td>${data.buku}</td>
+                        <td>${tglDiformat}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-delete" onclick="hapusData('${id}')">Dikembalikan</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                tbodyAdmin.innerHTML += rowAdmin;
+            }
+        });
+    });
+
+    // FUNGSI TOMBOL DIKEMBALIKAN (HAPUS DATA)
+    window.hapusData = async function(id) {
+        if(confirm("Apakah buku ini benar-benar sudah dikembalikan?")) {
+            try {
+                await deleteDoc(doc(db, "peminjaman", id));
+                alert("Data peminjaman berhasil diselesaikan!");
+            } catch (error) {
+                console.error("Gagal menghapus:", error);
+                alert("Gagal memproses pengembalian buku.");
+            }
+        }
+    };
 </script>
 </body>
 </html>
